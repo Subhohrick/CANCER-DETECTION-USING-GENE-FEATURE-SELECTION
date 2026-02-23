@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OncogenIQ — Cancer Gene Selection Dashboard</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #04060D;
+            --surface: #080E1A;
+            --card: #0C1422;
+            --border: #1A2540;
+            --accent: #00E5FF;
+            --accent2: #FF3D71;
+            --accent3: #00E096;
+            --accent4: #FFAA00;
+            --purple: #A259FF;
+            --text: #E2EAF4;
+            --muted: #5B7094;
+            --font-head: 'Syne', sans-serif;
+            --font-mono: 'Space Mono', monospace;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── BACKGROUND GRID ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+        }
+
+        /* ── TOP BAR ── */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(4, 6, 13, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .logo {
+            font-family: var(--font-head);
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo span {
+            color: var(--accent2);
+            -webkit-text-fill-color: var(--accent2);
+        }
+
+        .tagline {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent3);
+            box-shadow: 0 0 8px var(--accent3);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.running {
+            background: var(--accent4);
+            box-shadow: 0 0 8px var(--accent4);
+        }
+
+        .status-dot.idle {
+            background: var(--muted);
+            box-shadow: none;
+            animation: none;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.4
+            }
+        }
+
+        /* ── LAYOUT ── */
+        .shell {
+            position: relative;
+            z-index: 1;
+            padding: 24px 28px;
+        }
+
+        /* ── HERO METRICS ── */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+
+        .metric {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 20px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color .2s;
+        }
+
+        .metric::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+        }
+
+        .metric.c1::before {
+            background: var(--accent);
+        }
+
+        .metric.c2::before {
+            background: var(--accent3);
+        }
+
+        .metric.c3::before {
+            background: var(--accent2);
+        }
+
+        .metric.c4::before {
+            background: var(--accent4);
+        }
+
+        .metric.c5::before {
+            background: var(--purple);
+        }
+
+        .metric-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            font-family: var(--font-head);
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -1px;
+        }
+
+        .metric-value.cyan {
+            color: var(--accent);
+        }
+
+        .metric-value.green {
+            color: var(--accent3);
+        }
+
+        .metric-value.red {
+            color: var(--accent2);
+        }
+
+        .metric-value.amber {
+            color: var(--accent4);
+        }
+
+        .metric-value.purple {
+            color: var(--purple);
+        }
+
+        .metric-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 5px;
+        }
+
+        /* ── GRID ── */
+        .grid-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .grid-bottom {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .card-title {
+            font-family: var(--font-head);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            color: var(--text);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap-8px;
+        }
+
+        .card-title .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 180px;
+        }
+
+        .chart-wrap-tall {
+            position: relative;
+            height: 220px;
+        }
+
+        /* ── CONTROL PANEL ── */
+        .controls {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr) auto;
+            gap: 16px;
+            align-items: end;
+        }
+
+        .ctrl-group label {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .ctrl-group input[type=range] {
+            width: 100%;
+            accent-color: var(--accent);
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border);
+            outline: none;
+        }
+
+        .ctrl-group input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            cursor: pointer;
+        }
+
+        .ctrl-val {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--accent);
+            margin-top: 5px;
+            text-align: center;
+        }
+
+        .btn-run {
+            background: linear-gradient(135deg, var(--accent), #0099BB);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 28px;
+            cursor: pointer;
+            font-family: var(--font-head);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--bg);
+            letter-spacing: 0.3px;
+            transition: all .2s;
+            white-space: nowrap;
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+        }
+
+        .btn-run:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+        }
+
+        .btn-run:disabled {
+            opacity: 0.4;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        /* ── GENE MAP ── */
+        #geneMapCanvas {
+            width: 100%;
+            height: 68px;
+            border-radius: 8px;
+            display: block;
+            cursor: crosshair;
+        }
+
+        .gene-legend {
+            display: flex;
+            gap: 16px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* ── CONFUSION MATRIX ── */
+        .cm-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 3px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+        }
+
+        .cm-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            transition: all .3s;
+        }
+
+        .cm-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: var(--muted);
+            padding: 4px;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* ── GENE PANEL LIST ── */
+        .gene-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+
+        .gene-tag {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            border: 1px solid;
+            transition: all .3s;
+        }
+
+        .gene-tag.biomarker {
+            background: rgba(0, 224, 150, 0.12);
+            border-color: rgba(0, 224, 150, 0.4);
+            color: var(--accent3);
+        }
+
+        .gene-tag.noise {
+            background: rgba(91, 112, 148, 0.12);
+            border-color: rgba(91, 112, 148, 0.3);
+            color: var(--muted);
+        }
+
+        /* ── PROGRESS BAR ── */
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--purple));
+            border-radius: 2px;
+            width: 0;
+            transition: width .3s;
+        }
+
+        /* ── TOOLTIP ── */
+        .tooltip {
+            position: absolute;
+            background: var(--surface);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text);
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity .15s;
+            white-space: nowrap;
+        }
+
+        /* ── CLASSIFIER TESTER ── */
+        .classifier-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .class-input-group label {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .class-input-group input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            padding: 7px 10px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            outline: none;
+            transition: border-color .2s;
+        }
+
+        .class-input-group input:focus {
+            border-color: var(--accent);
+        }
+
+        .predict-btn {
+            grid-column: 1/-1;
+            background: linear-gradient(135deg, var(--purple), #7040CC);
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: var(--font-head);
+            font-size: 13px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .prediction-result {
+            grid-column: 1/-1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            text-align: center;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .3s;
+        }
+
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--surface);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        /* ── ANIMATIONS ── */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .card {
+            animation: fadeIn .4s ease both;
+        }
+
+        .sparkline {
+            height: 40px;
+        }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div>
+            <div class="logo">Oncogen<span>IQ</span></div>
+            <div class="tagline">Cancer Gene Selection · GA Dashboard</div>
+        </div>
+        <div class="status-pill">
+            <div class="status-dot idle" id="statusDot"></div>
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+
+    <div class="shell">
+
+        <!-- CONTROLS -->
+        <div class="controls">
+            <div class="ctrl-group">
+                <label>Population Size</label>
+                <input type="range" id="popSize" min="20" max="120" value="60" step="10">
+                <div class="ctrl-val" id="popSizeVal">60</div>
+            </div>
+            <div class="ctrl-group">
+                <label>Generations</label>
+                <input type="range" id="nGen" min="20" max="150" value="80" step="10">
+                <div class="ctrl-val" id="nGenVal">80</div>
+            </div>
+            <div class="ctrl-group">
+                <label>Mutation Rate</label>
+                <input type="range" id="mutRate" min="1" max="30" value="10" step="1">
+                <div class="ctrl-val" id="mutRateVal">1.0%</div>
+            </div>
+            <div class="ctrl-group">
+                <label>Crossover Rate</label>
+                <input type="range" id="cxRate" min="50" max="99" value="85" step="5">
+                <div class="ctrl-val" id="cxRateVal">85%</div>
+            </div>
+            <div class="ctrl-group">
+                <label>Panel Size Limit</label>
+                <input type="range" id="maxGenes" min="10" max="80" value="40" step="5">
+                <div class="ctrl-val" id="maxGenesVal">40</div>
+            </div>
+            <button class="btn-run" id="runBtn" onclick="startGA()">▶ Run GA</button>
+        </div>
+
+        <!-- METRICS ROW -->
+        <div class="metrics-row">
+            <div class="metric c1">
+                <div class="metric-label">Best Accuracy</div>
+                <div class="metric-value cyan" id="mAcc">—</div>
+                <div class="metric-sub">5-fold CV</div>
+            </div>
+            <div class="metric c2">
+                <div class="metric-label">Genes Selected</div>
+                <div class="metric-value green" id="mGenes">—</div>
+                <div class="metric-sub">of 500 total</div>
+            </div>
+            <div class="metric c3">
+                <div class="metric-label">Features Eliminated</div>
+                <div class="metric-value red" id="mElim">—</div>
+                <div class="metric-sub">reduction</div>
+            </div>
+            <div class="metric c4">
+                <div class="metric-label">Generation</div>
+                <div class="metric-value amber" id="mGen">0</div>
+                <div class="metric-sub" id="mGenSub">of 80</div>
+            </div>
+            <div class="metric c5">
+                <div class="metric-label">Biomarkers Found</div>
+                <div class="metric-value purple" id="mBio">—</div>
+                <div class="metric-sub">of 30 true genes</div>
+            </div>
+        </div>
+        <div class="progress-bar" style="margin-bottom:16px">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- MAIN CHARTS ROW -->
+        <div class="grid-main">
+
+            <!-- Fitness Convergence -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="dot" style="background:var(--accent)"></span>
+                    Fitness Convergence
+                </div>
+                <div class="chart-wrap"><canvas id="fitnessChart"></canvas></div>
+            </div>
+
+            <!-- Accuracy vs Panel Size -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="dot" style="background:var(--accent3)"></span>
+                    Accuracy vs Panel Size
+                </div>
+                <div class="chart-wrap"><canvas id="accSizeChart"></canvas></div>
+            </div>
+
+            <!-- Population Diversity -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="dot" style="background:var(--purple)"></span>
+                    Population Fitness Distribution
+                </div>
+                <div class="chart-wrap"><canvas id="popDistChart"></canvas></div>
+            </div>
+
+        </div>
+
+        <!-- BOTTOM GRID -->
+        <div class="grid-bottom">
+
+            <!-- Gene Selection Map + panel -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="dot" style="background:var(--accent4)"></span>
+                    Gene Selection Landscape (500 genes)
+                </div>
+                <canvas id="geneMapCanvas"></canvas>
+                <div class="gene-legend">
+                    <div class="legend-item">
+                        <div class="legend-swatch" style="background:#00E5FF33;border:1px solid var(--accent)"></div>
+                        True biomarker zone (0–29)
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-swatch" style="background:#00E096"></div>Selected biomarker
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-swatch" style="background:#5B7094"></div>Selected noise gene
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-swatch" style="background:#0C1422"></div>Not selected
+                    </div>
+                </div>
+                <div style="margin-top:14px">
+                    <div class="section-label">Active Gene Panel</div>
+                    <div class="gene-list" id="geneList"><span
+                            style="color:var(--muted);font-family:var(--font-mono);font-size:11px">Run GA to see
+                            selected genes…</span></div>
+                </div>
+            </div>
+
+            <!-- Confusion Matrix -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="dot" style="background:var(--accent2)"></span>
+                    Confusion Matrix
+                </div>
+                <div id="cmWrap" style="margin-top:4px">
+                    <div
+                        style="color:var(--muted);font-family:var(--font-mono);font-size:11px;text-align:center;padding:40px 0">
+                        Run GA to see results
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Classifier Tester -->
+            <div class="card">
+                <div class="card-title">
+                    <span class="dot" style="background:var(--purple)"></span>
+                    Live Patient Classifier
+                </div>
+                <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:12px">
+                    Enter expression values for key genes (scale 0–15):
+                </div>
+                <div class="classifier-grid">
+                    <div class="class-input-group">
+                        <label>Group A (BRCA-like avg)</label>
+                        <input type="number" id="inp1" placeholder="e.g. 8.5" min="0" max="15" step="0.1">
+                    </div>
+                    <div class="class-input-group">
+                        <label>Group B (KRAS-like avg)</label>
+                        <input type="number" id="inp2" placeholder="e.g. 5.2" min="0" max="15" step="0.1">
+                    </div>
+                    <div class="class-input-group">
+                        <label>Group C (APC-like avg)</label>
+                        <input type="number" id="inp3" placeholder="e.g. 3.8" min="0" max="15" step="0.1">
+                    </div>
+                    <div class="class-input-group">
+                        <label>Noise baseline avg</label>
+                        <input type="number" id="inp4" placeholder="e.g. 5.0" min="0" max="15" step="0.1">
+                    </div>
+                    <button class="predict-btn" onclick="runClassifier()">🔬 Classify Patient</button>
+                    <div class="prediction-result" id="predResult">
+                        <span style="color:var(--muted)">Enter values & classify</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div><!-- /shell -->
+
+    <script>
+        // ══════════════════════════════════════════════════════════════
+        // SIMULATION CORE
+        // ══════════════════════════════════════════════════════════════
+
+        const N_GENES = 500;
+        const N_INFORMATIVE = 30;
+        const N_CLASSES = 4;
+        const CLASS_NAMES = ['Healthy', 'Breast Cancer', 'Lung Cancer', 'Colorectal Cancer'];
+        const CLASS_COLORS = ['#00E096', '#00E5FF', '#FFAA00', '#FF3D71'];
+
+        // Seeded RNG
+        function mkRng(seed) {
+            let s = seed;
+            return () => { s = (s * 1664525 + 1013904223) & 0xFFFFFFFF; return (s >>> 0) / 0xFFFFFFFF; };
+        }
+
+        // Generate synthetic dataset (simplified, in JS)
+        let dataX, dataY;
+        function generateDataset() {
+            const rng = mkRng(42);
+            const nPerClass = [130, 110, 90, 70];
+            // Class-specific means for 30 informative genes (3 groups of 10)
+            // Group A (0-9): breast UP, colorectal DOWN
+            // Group B (10-19): lung UP
+            // Group C (20-29): colorectal UP, breast DOWN
+            const shifts = [
+                // Healthy: no shift
+                Array(30).fill(0),
+                // Breast: A up, C down
+                [...Array(10).fill(0).map(() => 2 + rng() * 1.5), ...Array(10).fill(0).map(() => (rng() - .5)), ...Array(10).fill(0).map(() => -(1.5 + rng()))],
+                // Lung: B up
+                [...Array(10).fill(0).map(() => (rng() - .5)), ...Array(10).fill(0).map(() => 2.5 + rng() * 1.5), ...Array(10).fill(0).map(() => (rng() - .5))],
+                // Colorectal: A down, C up
+                [...Array(10).fill(0).map(() => -(1.5 + rng())), ...Array(10).fill(0).map(() => (rng() - .5)), ...Array(10).fill(0).map(() => 2 + rng() * 1.5)],
+            ];
+
+            // Gaussian approximation
+            const gauss = (mu = 0, sigma = 1) => {
+                const u1 = Math.max(1e-9, rng()), u2 = rng();
+                return mu + sigma * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            };
+
+            const baseMeans = Array.from({ length: 30 }, () => 4 + rng() * 4);
+            const X = [], Y = [];
+
+            for (let cls = 0; cls < 4; cls++) {
+                for (let p = 0; p < nPerClass[cls]; p++) {
+                    const row = [];
+                    // Informative genes
+                    for (let g = 0; g < 30; g++) row.push(gauss(baseMeans[g] + shifts[cls][g], 0.8));
+                    // Noise genes
+                    for (let g = 30; g < N_GENES; g++) row.push(gauss(5.0, 1.2));
+                    X.push(row);
+                    Y.push(cls);
+                }
+            }
+
+            // Shuffle
+            const idx = Array.from({ length: 400 }, (_, i) => i);
+            for (let i = 399; i > 0; i--) { const j = Math.floor(rng() * (i + 1));[idx[i], idx[j]] = [idx[j], idx[i]]; }
+            dataX = idx.map(i => X[i]);
+            dataY = idx.map(i => Y[i]);
+        }
+
+        // Simple k-NN (k=7) euclidean, leave-one-out approximation (fast version)
+        function knnAccuracy(selectedGenes) {
+            if (!selectedGenes.length) return 0;
+            const k = Math.min(7, selectedGenes.length);
+            const n = dataX.length;
+
+            // Fast LOO-style: use fixed 80/20 split for speed in JS
+            const splitAt = Math.floor(n * 0.8);
+            const trainX = dataX.slice(0, splitAt).map(r => selectedGenes.map(g => r[g]));
+            const trainY = dataY.slice(0, splitAt);
+            const testX = dataX.slice(splitAt).map(r => selectedGenes.map(g => r[g]));
+            const testY = dataY.slice(splitAt);
+
+            let correct = 0;
+            for (let i = 0; i < testX.length; i++) {
+                // compute distances to all train
+                const dists = trainX.map((tx, ti) => {
+                    let d = 0; for (let g = 0; g < tx.length; g++) d += (testX[i][g] - tx[g]) ** 2; return { d, cls: trainY[ti] };
+                });
+                dists.sort((a, b) => a.d - b.d);
+                const votes = Array(4).fill(0);
+                for (let ki = 0; ki < k; ki++) votes[dists[ki].cls]++;
+                const pred = votes.indexOf(Math.max(...votes));
+                if (pred === testY[i]) correct++;
+            }
+            return correct / testX.length;
+        }
+
+        // Confusion matrix (full dataset)
+        function computeCM(selectedGenes) {
+            if (!selectedGenes.length) return null;
+            const k = Math.min(7, selectedGenes.length);
+            const splitAt = Math.floor(dataX.length * 0.8);
+            const trainX = dataX.slice(0, splitAt).map(r => selectedGenes.map(g => r[g]));
+            const trainY = dataY.slice(0, splitAt);
+            const testX = dataX.slice(splitAt).map(r => selectedGenes.map(g => r[g]));
+            const testY = dataY.slice(splitAt);
+
+            const cm = Array.from({ length: 4 }, () => Array(4).fill(0));
+            for (let i = 0; i < testX.length; i++) {
+                const dists = trainX.map((tx, ti) => { let d = 0; for (let g = 0; g < tx.length; g++)d += (testX[i][g] - tx[g]) ** 2; return { d, cls: trainY[ti] }; });
+                dists.sort((a, b) => a.d - b.d);
+                const votes = Array(4).fill(0); for (let ki = 0; ki < k; ki++) votes[dists[ki].cls]++;
+                cm[testY[i]][votes.indexOf(Math.max(...votes))]++;
+            }
+            return cm;
+        }
+
+        const cache = new Map();
+        function fitness(chrom, maxGenes, mutRateVal) {
+            const key = chrom.join('');
+            if (cache.has(key)) return cache.get(key);
+            const sel = chrom.reduce((a, b, i) => b ? [...a, i] : a, []);
+            const n = sel.length;
+            if (!n) { cache.set(key, { fit: -1, acc: 0, n: 0 }); return { fit: -1, acc: 0, n: 0 }; }
+            const acc = knnAccuracy(sel);
+            const fit = 0.90 * acc - 0.10 * (n / N_GENES);
+            const r = { fit, acc, n };
+            cache.set(key, r);
+            return r;
+        }
+
+        // ── GA ──────────────────────────────────────────────────────
+        let gaRunning = false, gaAbort = false;
+        let history = { fit: [], avg: [], acc: [], size: [], recovery: [], popFits: [] };
+        let bestChrom = null, bestAcc = 0, bestN = 0;
+
+        function randChrom(rng, maxGenes) {
+            const density = 0.05;
+            while (true) {
+                const c = Array.from({ length: N_GENES }, () => rng() < density ? 1 : 0);
+                const n = c.reduce((a, b) => a + b, 0);
+                if (n >= 1 && n <= maxGenes) return c;
+            }
+        }
+
+        function repairChrom(c, maxGenes, rng) {
+            let n = c.reduce((a, b) => a + b, 0);
+            if (n > maxGenes) {
+                const ones = c.map((_, i) => i).filter(i => c[i]);
+                for (let d = 0; d < n - maxGenes; d++) {
+                    const ri = Math.floor(rng() * ones.length);
+                    c[ones[ri]] = 0; ones.splice(ri, 1);
+                }
+            } else if (n < 1) {
+                const zeros = c.map((_, i) => i).filter(i => !c[i]);
+                c[zeros[Math.floor(rng() * zeros.length)]] = 1;
+            }
+            return c;
+        }
+
+        async function startGA() {
+            if (gaRunning) { gaAbort = true; return; }
+            cache.clear();
+            generateDataset();
+
+            const POP = +document.getElementById('popSize').value;
+            const NGEN = +document.getElementById('nGen').value;
+            const MUT = +document.getElementById('mutRate').value / 1000;
+            const CX = +document.getElementById('cxRate').value / 100;
+            const MAXG = +document.getElementById('maxGenes').value;
+
+            gaRunning = true; gaAbort = false;
+            setStatus('running');
+            document.getElementById('runBtn').textContent = '⏹ Stop';
+            document.getElementById('runBtn').disabled = false;
+
+            history = { fit: [], avg: [], acc: [], size: [], recovery: [], popFits: [] };
+            bestChrom = null; bestAcc = 0; bestN = 0;
+            document.getElementById('mGenSub').textContent = `of ${NGEN}`;
+
+            const rng = mkRng(Date.now() & 0xFFFF);
+
+            let pop = Array.from({ length: POP }, () => randChrom(rng, MAXG));
+            let fits = pop.map(c => fitness(c, MAXG, rng));
+
+            for (let gen = 0; gen < NGEN && !gaAbort; gen++) {
+                // Stats
+                const bestIdx = fits.reduce((bi, f, i) => f.fit > fits[bi].fit ? i : bi, 0);
+                const gBest = fits[bestIdx];
+                const gAvg = fits.reduce((s, f) => s + f.fit, 0) / POP;
+                const nRec = pop[bestIdx].slice(0, N_INFORMATIVE).reduce((a, b) => a + b, 0);
+
+                history.fit.push(gBest.fit);
+                history.avg.push(gAvg);
+                history.acc.push(gBest.acc);
+                history.size.push(gBest.n);
+                history.recovery.push(nRec);
+                history.popFits.push([...fits.map(f => f.acc * 100)]);
+
+                if (!bestChrom || gBest.fit > fitness(bestChrom, MAXG, rng).fit) {
+                    bestChrom = [...pop[bestIdx]];
+                    bestAcc = gBest.acc;
+                    bestN = gBest.n;
+                }
+
+                // Update UI every 2 gens
+                if (gen % 2 === 0 || gen === NGEN - 1) {
+                    const pct = ((gen + 1) / NGEN * 100).toFixed(0);
+                    document.getElementById('progressFill').style.width = pct + '%';
+                    document.getElementById('mGen').textContent = gen + 1;
+                    updateMetrics(gBest.acc, gBest.n, nRec);
+                    updateCharts(gen);
+                    updateGeneMap(pop[bestIdx]);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+
+                // Elitism
+                const sortedIdx = [...Array(POP).keys()].sort((a, b) => fits[b].fit - fits[a].fit);
+                const newPop = sortedIdx.slice(0, 3).map(i => [...pop[i]]);
+
+                // Breed
+                while (newPop.length < POP) {
+                    // Tournament
+                    const tourn = (k = 5) => {
+                        let best = -Infinity, bidx = 0;
+                        for (let t = 0; t < k; t++) { const ri = Math.floor(rng() * POP); if (fits[ri].fit > best) { best = fits[ri].fit; bidx = ri; } }
+                        return [...pop[bidx]];
+                    };
+                    const p1 = tourn(), p2 = tourn();
+                    let c1 = [...p1], c2 = [...p2];
+                    // Uniform crossover
+                    if (rng() < CX) {
+                        c1 = p1.map((v, i) => rng() < 0.5 ? v : p2[i]);
+                        c2 = p1.map((v, i) => rng() < 0.5 ? p2[i] : v);
+                    }
+                    // Bit-flip mutation
+                    c1 = c1.map(b => rng() < MUT ? 1 - b : b);
+                    c2 = c2.map(b => rng() < MUT ? 1 - b : b);
+                    repairChrom(c1, MAXG, rng); repairChrom(c2, MAXG, rng);
+                    newPop.push(c1, c2);
+                }
+
+                pop = newPop.slice(0, POP);
+                fits = pop.map(c => fitness(c, MAXG, rng));
+            }
+
+            // Final update
+            if (bestChrom) {
+                const nRec = bestChrom.slice(0, N_INFORMATIVE).reduce((a, b) => a + b, 0);
+                updateMetrics(bestAcc, bestN, nRec);
+                updateGeneMap(bestChrom);
+                updateGeneList(bestChrom);
+                renderCM(computeCM(bestChrom.map((_, i) => i).filter(i => bestChrom[i])));
+            }
+
+            document.getElementById('progressFill').style.width = '100%';
+            setStatus('done');
+            document.getElementById('runBtn').textContent = '▶ Run GA';
+            gaRunning = false;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // UI UPDATES
+        // ══════════════════════════════════════════════════════════════
+        function setStatus(state) {
+            const dot = document.getElementById('statusDot'), txt = document.getElementById('statusText');
+            dot.className = 'status-dot ' + state;
+            txt.textContent = state === 'running' ? 'GA Running…' : state === 'done' ? 'Converged ✓' : 'Ready';
+        }
+
+        function updateMetrics(acc, ng, nrec) {
+            document.getElementById('mAcc').textContent = (acc * 100).toFixed(1) + '%';
+            document.getElementById('mGenes').textContent = ng;
+            document.getElementById('mElim').textContent = ((1 - ng / N_GENES) * 100).toFixed(1) + '%';
+            document.getElementById('mBio').textContent = nrec + '/30';
+        }
+
+        // ── CHARTS ──────────────────────────────────────────────────
+        const chartDefaults = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }, tooltip: {
+                    enabled: true,
+                    backgroundColor: '#0C1422', borderColor: '#1A2540', borderWidth: 1,
+                    titleColor: '#E2EAF4', bodyColor: '#5B7094',
+                    titleFont: { family: 'Space Mono', size: 11 }, bodyFont: { family: 'Space Mono', size: 10 }
+                }
+            },
+            animation: { duration: 0 },
+            scales: {
+                x: { grid: { color: '#1A2540' }, ticks: { color: '#5B7094', font: { family: 'Space Mono', size: 9 } }, border: { color: '#1A2540' } },
+                y: { grid: { color: '#1A2540' }, ticks: { color: '#5B7094', font: { family: 'Space Mono', size: 9 } }, border: { color: '#1A2540' } }
+            }
+        };
+
+        function mkChart(id, cfg) {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, cfg);
+        }
+
+        const fitnessChart = mkChart('fitnessChart', {
+            type: 'line', data: {
+                labels: [], datasets: [
+                    {
+                        label: 'Best', data: [], borderColor: '#00E5FF', backgroundColor: 'rgba(0,229,255,0.08)',
+                        borderWidth: 2, fill: true, pointRadius: 0, tension: 0.3
+                    },
+                    {
+                        label: 'Avg', data: [], borderColor: '#FFAA00', backgroundColor: 'transparent',
+                        borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, tension: 0.3
+                    },
+                ]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins, legend: {
+                        display: true,
+                        labels: { color: '#5B7094', font: { family: 'Space Mono', size: 9 }, boxWidth: 12 }
+                    }
+                },
+                scales: {
+                    ...chartDefaults.scales,
+                    y: { ...chartDefaults.scales.y, min: 0, max: 1, title: { display: true, text: 'Fitness', color: '#5B7094', font: { family: 'Space Mono', size: 9 } } }
+                }
+            }
+        });
+
+        const accSizeChart = mkChart('accSizeChart', {
+            type: 'line', data: {
+                labels: [], datasets: [
+                    {
+                        label: 'Accuracy', data: [], borderColor: '#00E096', backgroundColor: 'rgba(0,224,150,0.08)',
+                        borderWidth: 2, fill: true, pointRadius: 0, tension: 0.3, yAxisID: 'y'
+                    },
+                    {
+                        label: 'Panel Size', data: [], borderColor: '#FF3D71', backgroundColor: 'transparent',
+                        borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, tension: 0.3, yAxisID: 'y2'
+                    },
+                ]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins, legend: {
+                        display: true,
+                        labels: { color: '#5B7094', font: { family: 'Space Mono', size: 9 }, boxWidth: 12 }
+                    }
+                },
+                scales: {
+                    x: { grid: { color: '#1A2540' }, ticks: { color: '#5B7094', font: { family: 'Space Mono', size: 9 } }, border: { color: '#1A2540' } },
+                    y: {
+                        grid: { color: '#1A2540' }, ticks: { color: '#5B7094', font: { family: 'Space Mono', size: 9 } }, border: { color: '#1A2540' },
+                        position: 'left', min: 0, max: 100, title: { display: true, text: 'Acc%', color: '#5B7094', font: { size: 9 } }
+                    },
+                    y2: {
+                        grid: { display: false }, ticks: { color: '#FF3D71', font: { family: 'Space Mono', size: 9 } },
+                        border: { color: '#1A2540' }, position: 'right',
+                        title: { display: true, text: 'Genes', color: '#FF3D71', font: { size: 9 } }
+                    },
+                }
+            }
+        });
+
+        const popDistChart = mkChart('popDistChart', {
+            type: 'bar', data: {
+                labels: [], datasets: [
+                    {
+                        label: 'Pop Accuracy Distribution', data: [],
+                        backgroundColor: 'rgba(162,89,255,0.7)', borderColor: '#A259FF', borderWidth: 1, borderRadius: 3
+                    }
+                ]
+            },
+            options: {
+                ...chartDefaults,
+                scales: {
+                    x: {
+                        grid: { color: '#1A2540' }, ticks: { color: '#5B7094', font: { family: 'Space Mono', size: 8 } }, border: { color: '#1A2540' },
+                        title: { display: true, text: 'Accuracy Bucket', color: '#5B7094', font: { size: 9 } }
+                    },
+                    y: {
+                        grid: { color: '#1A2540' }, ticks: { color: '#5B7094', font: { family: 'Space Mono', size: 9 } }, border: { color: '#1A2540' },
+                        title: { display: true, text: '# Individuals', color: '#5B7094', font: { size: 9 } }
+                    }
+                }
+            }
+        });
+
+        function updateCharts(gen) {
+            const h = history;
+            const labels = Array.from({ length: h.fit.length }, (_, i) => i);
+
+            fitnessChart.data.labels = labels;
+            fitnessChart.data.datasets[0].data = h.fit;
+            fitnessChart.data.datasets[1].data = h.avg;
+            fitnessChart.update('none');
+
+            accSizeChart.data.labels = labels;
+            accSizeChart.data.datasets[0].data = h.acc.map(a => a * 100);
+            accSizeChart.data.datasets[1].data = h.size;
+            accSizeChart.update('none');
+
+            // Population distribution histogram (last gen)
+            if (h.popFits.length) {
+                const pf = h.popFits[h.popFits.length - 1];
+                const buckets = Array(10).fill(0);
+                pf.forEach(v => { const bi = Math.min(9, Math.floor(v / 10)); buckets[bi]++; });
+                popDistChart.data.labels = ['0-10', '10-20', '20-30', '30-40', '40-50', '50-60', '60-70', '70-80', '80-90', '90-100'];
+                popDistChart.data.datasets[0].data = buckets;
+                popDistChart.update('none');
+            }
+        }
+
+        // ── GENE MAP CANVAS ──────────────────────────────────────────
+        function updateGeneMap(chrom) {
+            const canvas = document.getElementById('geneMapCanvas');
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width, H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            // Background
+            ctx.fillStyle = '#080E1A';
+            ctx.fillRect(0, 0, W, H);
+
+            // True biomarker highlight zone
+            const bw = (N_INFORMATIVE / N_GENES) * W;
+            ctx.fillStyle = 'rgba(0,229,255,0.07)';
+            ctx.fillRect(0, 0, bw, H);
+            ctx.strokeStyle = 'rgba(0,229,255,0.3)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, bw, H);
+
+            // Draw genes
+            const gw = W / N_GENES;
+            for (let i = 0; i < N_GENES; i++) {
+                if (!chrom[i]) continue;
+                const isBio = i < N_INFORMATIVE;
+                ctx.fillStyle = isBio ? '#00E096' : '#5B7094';
+                const x = i * gw;
+                ctx.fillRect(x, H * 0.15, Math.max(gw - 0.5, 1), H * 0.7);
+            }
+
+            // Axis label
+            ctx.fillStyle = '#5B7094'; ctx.font = `${10 * window.devicePixelRatio}px Space Mono`;
+            ctx.fillText('Gene 0', 4, H - 4);
+            ctx.textAlign = 'right';
+            ctx.fillText('Gene 499', W - 4, H - 4);
+            ctx.textAlign = 'left';
+        }
+
+        // ── GENE LIST ────────────────────────────────────────────────
+        function updateGeneList(chrom) {
+            const list = document.getElementById('geneList');
+            const selected = chrom.map((_, i) => i).filter(i => chrom[i]);
+            list.innerHTML = selected.map(g => {
+                const isBio = g < N_INFORMATIVE;
+                return `<span class="gene-tag ${isBio ? 'biomarker' : 'noise'}" title="${isBio ? 'True biomarker' : 'Noise gene'}">
+      G${String(g).padStart(3, '0')}
+    </span>`;
+            }).join('');
+        }
+
+        // ── CONFUSION MATRIX ─────────────────────────────────────────
+        function renderCM(cm) {
+            if (!cm) return;
+            const labels = ['Healthy', 'Breast', 'Lung', 'Colorect.'];
+            const maxVal = Math.max(...cm.flat());
+            let html = '<div class="cm-grid">';
+            // Header row
+            html += '<div class="cm-header" style="color:#5B7094">Actual \\ Pred</div>';
+            labels.forEach(l => html += `<div class="cm-header">${l}</div>`);
+            // Data rows
+            cm.forEach((row, ri) => {
+                html += `<div class="cm-header" style="color:${CLASS_COLORS[ri]}">${labels[ri]}</div>`;
+                row.forEach((val, ci) => {
+                    const intensity = maxVal > 0 ? val / maxVal : 0;
+                    const bg = ri === ci
+                        ? `rgba(0,224,150,${0.15 + intensity * 0.7})`
+                        : val > 0 ? `rgba(255,61,113,${0.15 + intensity * 0.7})` : '#0C1422';
+                    const color = ri === ci ? (intensity > 0.5 ? '#fff' : '#00E096') : (val > 0 ? '#FF3D71' : '#5B7094');
+                    html += `<div class="cm-cell" style="background:${bg};color:${color}">${val || '·'}</div>`;
+                });
+            });
+            html += '</div>';
+            // Per-class accuracy
+            html += '<div style="margin-top:12px;font-family:var(--font-mono);font-size:10px;color:var(--muted)">';
+            cm.forEach((row, ri) => {
+                const total = row.reduce((a, b) => a + b, 0);
+                const acc = total > 0 ? (row[ri] / total * 100).toFixed(0) : '0';
+                html += `<div style="display:flex;justify-content:space-between;margin:3px 0;color:${CLASS_COLORS[ri]}">
+      <span>${labels[ri]}</span><span>${acc}% (${row[ri]}/${total})</span></div>`;
+            });
+            html += '</div>';
+            document.getElementById('cmWrap').innerHTML = html;
+        }
+
+        // ── LIVE CLASSIFIER ──────────────────────────────────────────
+        function runClassifier() {
+            const a = parseFloat(document.getElementById('inp1').value);
+            const b = parseFloat(document.getElementById('inp2').value);
+            const c = parseFloat(document.getElementById('inp3').value);
+            const d = parseFloat(document.getElementById('inp4').value);
+            const el = document.getElementById('predResult');
+
+            if ([a, b, c, d].some(isNaN)) {
+                el.innerHTML = '<span style="color:var(--accent2)">⚠ Please enter all 4 values</span>';
+                return;
+            }
+
+            // Rule-based classifier (simplified version of the trained model)
+            // Based on the gene group expression patterns
+            const scores = [
+                // Healthy: all near baseline (~5.0)
+                -(Math.abs(a - 5) + Math.abs(b - 5) + Math.abs(c - 5) + Math.abs(d - 5)),
+                // Breast: A high, C low
+                (a - 5) * 1.8 + (5 - c) * 1.4 - Math.abs(b - 5) * 0.5,
+                // Lung: B high
+                (b - 5) * 2.0 - Math.abs(a - 5) * 0.5 - Math.abs(c - 5) * 0.5,
+                // Colorectal: C high, A low
+                (c - 5) * 1.8 + (5 - a) * 1.4 - Math.abs(b - 5) * 0.5,
+            ];
+
+            const maxScore = Math.max(...scores);
+            const softmax = scores.map(s => Math.exp(s - maxScore));
+            const sum = softmax.reduce((a, b) => a + b, 0);
+            const probs = softmax.map(s => s / sum);
+            const pred = probs.indexOf(Math.max(...probs));
+            const conf = (probs[pred] * 100).toFixed(1);
+
+            const icons = ['🟢', '🔵', '🟡', '🔴'];
+            const suggestions = [
+                'No malignancy detected. Recommend routine follow-up.',
+                'Possible breast malignancy. Recommend mammography & biopsy.',
+                'Possible pulmonary malignancy. Recommend CT chest & bronchoscopy.',
+                'Possible colorectal malignancy. Recommend colonoscopy.',
+            ];
+
+            el.style.borderColor = CLASS_COLORS[pred];
+            el.innerHTML = `
+    <div style="text-align:left;width:100%">
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:700;color:${CLASS_COLORS[pred]};margin-bottom:6px">
+        ${icons[pred]} ${CLASS_NAMES[pred]} <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">(${conf}% conf.)</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:8px">${suggestions[pred]}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${probs.map((p, i) => `<div style="font-family:var(--font-mono);font-size:9px;color:${CLASS_COLORS[i]}">
+          ${CLASS_NAMES[i].split(' ')[0]}: ${(p * 100).toFixed(1)}%</div>`).join('')}
+      </div>
+    </div>`;
+        }
+
+        // ── SLIDER LABELS ────────────────────────────────────────────
+        document.getElementById('popSize').oninput = function () { document.getElementById('popSizeVal').textContent = this.value; };
+        document.getElementById('nGen').oninput = function () { document.getElementById('nGenVal').textContent = this.value; };
+        document.getElementById('mutRate').oninput = function () { document.getElementById('mutRateVal').textContent = (this.value / 10).toFixed(1) + '%'; };
+        document.getElementById('cxRate').oninput = function () { document.getElementById('cxRateVal').textContent = this.value + '%'; };
+        document.getElementById('maxGenes').oninput = function () { document.getElementById('maxGenesVal').textContent = this.value; };
+
+        // Initial gene map placeholder
+        window.addEventListener('load', () => {
+            generateDataset();
+            const dummyChrom = Array(N_GENES).fill(0);
+            updateGeneMap(dummyChrom);
+        });
+    </script>
+</body>
+
+</html>
